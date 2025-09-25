@@ -234,6 +234,8 @@ def build_security_master() -> pd.DataFrame:
     # remove etf
     df = df[df["etf"] == False]
 
+
+
     # remove units, rights, warrants
    # junk = r"(?i)\bUnit(s)?\b|\bRight(s)?\b|\bWarrant(s)?\b|\bOrdinary Share(s)? \w+? Pref"
    # df = df[~df["security_name"].str.contains(junk, na=False)]
@@ -249,6 +251,11 @@ def build_security_master() -> pd.DataFrame:
 
     # adjust for y finance grab
     df["symbol_yf"] = df["symbol"].str.replace(".", "-", regex=False)
+
+    # drop etf and test issue cols
+
+    df = df.drop(columns=['etf', 'test_issue'])
+    
 
     # Stable sort for reproducibility
     df = df.sort_values(["exchange", "symbol"]).reset_index(drop=True)
