@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Tuple, Dict, cast
 import pandas as pd
 import requests
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,6 +20,69 @@ NASDAQ_OTHER_URL :str  = cast(str, os.getenv('OTHER_URL'))
 SEC_TICKERS_URL : str = cast(str, os.getenv('SEC_TICKERS'))
 CONTACT_EMAIL : str = cast(str, os.getenv('CONTACT_EMAIL'))
 
+EXCLUDE_PATTERNS = {
+    # Exchange-traded notes
+    "ETN": re.compile(r"\bETN(s)?\b|Exchange[- ]Traded Note(s)?", flags=re.IGNORECASE),
+
+    # Exchange-traded debt / “baby bonds” / notes
+    "ETD_NOTES": re.compile(
+        r"\b(?:Senior|Subordinated|Convertible|Fixed[- ]Rate|Floating[- ]Rate)\s+Note(s)?\b"
+        r"|\bDebenture(s)?\b|\bBond(s)?\b|\bDue\s+20\d{2}\b",
+        flags=re.IGNORECASE
+    ),
+
+    # Preferred stock and depositary shares of preferred
+    "PREFERRED": re.compile(
+        r"\bPreferred\b|\bPreference\b|\bPfd\b|Depositary Share(s)?",
+        flags=re.IGNORECASE
+    ),
+
+    # ADR/ADS wrappers
+    "ADR_ADS": re.compile(
+        r"\bADR(s)?\b|\bADS\b|\bAmerican\s+Depositary\b",
+        flags=re.IGNORECASE
+    ),
+
+    # SPAC junk and general units/rights/warrants
+    "UNITS_RIGHTS_WARRANTS": re.compile(
+        r"\bUnit(s)?\b|\bSubunit(s)?\b|\bRight(s)?\b|\bWarrant(s)?\b|\bWRT\b",
+        flags=re.IGNORECASE
+    ),
+
+    # CVRs
+    "CVR": re.compile(r"\bContingent Value Right(s)?\b|\bCVR(s)?\b", flags=re.IGNORECASE),
+
+    # Partnership units (not corporate common)
+    "PARTNERSHIP_UNITS": re.compile(
+        r"\bCommon Unit(s)?\b|\bLP Unit(s)?\b|\bLimited Partnership\b",
+        flags=re.IGNORECASE
+    ),
+
+    # Foreign ordinary shares (exclude only if you want strictly “US common only”)
+    "ORDINARY_SHARES": re.compile(r"\bOrdinary Share(s)?\b", flags=re.IGNORECASE),
+
+    # Trust-y debt wrappers
+    "TRUST_DEBT": re.compile(r"\bCapital Trust\b|\bTrust Preferred\b", flags=re.IGNORECASE),
+
+    # When-issued placeholders
+    "WHEN_ISSUED": re.compile(r"\bWhen[- ]Issued\b|\bWI\b", flags=re.IGNORECASE),
+}
+
+def build_exclusion_mask(name_series: pd.Series) -> pd.Series:
+    s = name_series.astype("string")
+    mask = pd.Series(False, index=s.index)
+    for pat in EXCLUDE_PATTERNS.values():
+        mask |= s.str.contains(pat, na=False)
+    return mask
+
+def first_exclusion_reason(name: str) -> str | None:
+    if not isinstance(name, str):
+        return None
+    for label, pat in EXCLUDE_PATTERNS.items():
+        if pat.search(name):
+            return label
+    return None
+
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "data", "listings")
@@ -26,10 +90,31 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 
 def load_sec_company_tickers() -> pd.DataFrame:
-    headers = {f"User-Agent": "ValueInvestingDash/0.1 ({CONTACT_EMAIL})"}
+    SEC_HEADERS = {
+    "User-Agent": "ValueInvestingDash/0.1 (Michael C. Eaton; me3870@rit.edu)",
+    "Accept": "application/json",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
+    "Referer": "https://www.sec.gov/edgar/searchedgar/companysearch.html",
+}
+    r = requests.get(SEC_TICKERS_URL, headers=SEC_HEADERS, timeout=30)
+    r.raise_for_status()
+
+    obj = r.json()
+    rows = pd.DataFrame.from_records(list(obj.values()))
+    rows['ticker'] = rows['ticker'].str.upper().str.strip()
+    rows['cik'] = rows['cik_str'].astype('Int64')
+    rows = rows.rename(columns={'title': 'company_name'})
 
 
-    return pd.DataFrame()
+    return rows[['ticker', 'cik', 'company_name']]
+
+def enrich_with_cik(df: pd.DataFrame) -> pd.DataFrame:
+    sec = load_sec_company_tickers()
+    out = df.merge(sec, left_on='symbol', right_on='ticker', how='left')
+    out = out.drop(columns=['ticker'])
+
+    return out
 
 
 def _get(url: str) -> str:
@@ -128,8 +213,11 @@ def build_security_master() -> pd.DataFrame:
     b['_prio'] = 1
 
     df = pd.concat([a, b], ignore_index=True)
+
+    exclude_mask = build_exclusion_mask(df["security_name"])
+
     df = df.sort_values(by=['symbol', '_prio']).drop_duplicates(subset=['symbol'], keep='first')
-    df = df.drop(columns=['_prio'])  # you forgot to assign
+    df = df.drop(columns=['_prio']) 
 
     
 
@@ -147,8 +235,11 @@ def build_security_master() -> pd.DataFrame:
     df = df[df["etf"] == False]
 
     # remove units, rights, warrants
-    junk = r"(?i)\bUnit(s)?\b|\bRight(s)?\b|\bWarrant(s)?\b|\bOrdinary Share(s)? \w+? Pref"
-    df = df[~df["security_name"].str.contains(junk, na=False)]
+   # junk = r"(?i)\bUnit(s)?\b|\bRight(s)?\b|\bWarrant(s)?\b|\bOrdinary Share(s)? \w+? Pref"
+   # df = df[~df["security_name"].str.contains(junk, na=False)]
+    before = len(df)
+    df = df[~exclude_mask].copy()
+    print(f"Filtered non-common instruments by name: {before - len(df)} removed")
 
     # check for weird ticker lengths
     too_long = ~df["symbol"].str.len().between(1, 7)  
@@ -220,6 +311,7 @@ def diff_snapshots(prev_path: str, curr_df: pd.DataFrame) -> Dict[str, pd.DataFr
 def main():
     now = datetime.now(timezone.utc)
     df = build_security_master()
+    df = enrich_with_cik(df)
     csv_path, pq_path = write_snapshot(df, now)
 
     prev_path = latest_previous_snapshot(now)
