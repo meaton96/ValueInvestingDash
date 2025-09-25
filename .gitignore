@@ -53,3 +53,7 @@ ENV/
 # Project data exports (ignored in repo)
 data/*
 !data/.gitkeep
+
+
+# env
+.env

@@ -8,15 +8,28 @@ from datetime import datetime, timezone
 from typing import Tuple, Dict, cast
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 
-NASDAQ_NASDAQ_URL = "http://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
-NASDAQ_OTHER_URL  = "http://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
+load_dotenv()
 
+
+
+NASDAQ_NASDAQ_URL : str = cast(str, os.getenv('NAS_URL'))
+NASDAQ_OTHER_URL :str  = cast(str, os.getenv('OTHER_URL'))
+SEC_TICKERS_URL : str = cast(str, os.getenv('SEC_TICKERS'))
+CONTACT_EMAIL : str = cast(str, os.getenv('CONTACT_EMAIL'))
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "data", "listings")
 os.makedirs(OUT_DIR, exist_ok=True)
+
+
+def load_sec_company_tickers() -> pd.DataFrame:
+    headers = {f"User-Agent": "ValueInvestingDash/0.1 ({CONTACT_EMAIL})"}
+
+
+    return pd.DataFrame()
 
 
 def _get(url: str) -> str:
