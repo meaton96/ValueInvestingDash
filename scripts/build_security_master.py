@@ -5,7 +5,7 @@ import json
 import gzip
 import hashlib
 from datetime import datetime, timezone
-from typing import Tuple, Dict
+from typing import Tuple, Dict, cast
 import pandas as pd
 import requests
 
@@ -29,6 +29,7 @@ def _get(url: str) -> str:
         if r.ok:
             return r.text
     r.raise_for_status()
+    return ""
 
 def _read_pipe_table(text: str) -> pd.DataFrame:
     # convert data from pipe delim text to data frame
@@ -60,8 +61,8 @@ def load_nasdaqlisted() -> pd.DataFrame:
         "etf": _map_yn_bool(df.get("ETF")),
         "test_issue": _map_yn_bool(df.get("Test Issue")),
         "round_lot_size": pd.to_numeric(df.get("Round Lot Size", "100"), errors="coerce"),
-        "market_category": df.get("Market Category", "").fillna("").str.strip(),
-        "financial_status": df.get("Financial Status", "").fillna("").str.strip(),
+        "market_category": cast(pd.Series, df.get("Market Category", "")).fillna("").str.strip(),
+        "financial_status": cast(pd.Series, df.get("Financial Status", "")).fillna("").str.strip(),
         "nextshares": _map_yn_bool(df.get("NextShares")),
         "source": "nasdaqlisted",
     })
@@ -95,8 +96,8 @@ def load_otherlisted() -> pd.DataFrame:
         "test_issue": _map_yn_bool(df.get("Test Issue")),
         "round_lot_size": pd.to_numeric(df.get("Round Lot Size", "100"), errors="coerce"),
         # carry a few helpful raw columns
-        "cqs_symbol": df.get("CQS Symbol", "").fillna("").str.strip(),
-        "nasdaq_symbol": df.get("NASDAQ Symbol", "").fillna("").str.strip(),
+        "cqs_symbol": cast(pd.Series, df.get("CQS Symbol", "")).fillna("").str.strip(),
+        "nasdaq_symbol": cast(pd.Series, df.get("NASDAQ Symbol", "")).fillna("").str.strip(),
         "source": "otherlisted",
     })
     return out
@@ -140,7 +141,7 @@ def build_security_master() -> pd.DataFrame:
     too_long = ~df["symbol"].str.len().between(1, 7)  
     if too_long.any():
         print(f"Warning: {too_long.sum()} symbols have length outside 1..7; keeping them for now.")
-        print(too_long.head())
+       # print(too_long.head())
 
     # adjust for y finance grab
     df["symbol_yf"] = df["symbol"].str.replace(".", "-", regex=False)
@@ -172,10 +173,12 @@ def latest_previous_snapshot(now: datetime) -> str:
     # choose the most recent prior to today if multiple exist
     return os.path.join(OUT_DIR, files[-1])
 
-def _map_yn_bool(series: pd.Series) -> pd.Series:
+def _map_yn_bool(series: pd.Series | None) -> pd.Series:
     # Robust and quiet: treat anything == 'Y' (case-insensitive) as True, else False
-    s = series.astype("string")  # keeps NA as <NA>, not 'nan'
-    return s.str.upper().eq("Y").fillna(False)
+    if series is not None:
+        s = series.astype("string")  # keeps NA as <NA>, not 'nan'
+        return s.str.upper().eq("Y").fillna(False)
+    return pd.Series()
 
 def diff_snapshots(prev_path: str, curr_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     if not prev_path:
@@ -191,7 +194,7 @@ def diff_snapshots(prev_path: str, curr_df: pd.DataFrame) -> Dict[str, pd.DataFr
     # changed rows: same symbol exists, but any non-key field differs
     merged = prev.merge(curr_df, on=key, how="inner", suffixes=("_prev", "_curr"))
     compare_cols = [c for c in curr_df.columns if c != key]
-    changed_mask = False
+    changed_mask = pd.Series(False, index=merged.index, dtype=bool)
     for c in compare_cols:
         a = f"{c}_prev"
         b = f"{c}_curr"
