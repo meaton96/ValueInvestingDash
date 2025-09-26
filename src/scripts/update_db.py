@@ -8,11 +8,11 @@ from math import ceil
 import time
 from src.db_scripts.securities import *
 
-ADVISORY_LOCK_KEY = 990656761
+
 
 load_dotenv()
 DB_URI = os.getenv("DB_URI") 
-
+ADVISORY_LOCK_KEY = os.getenv('ADVISORY_LOCK_KEY')
 
 if not DB_URI:
     raise ValueError("No DB_URI found in environment variables (DB_URI).")

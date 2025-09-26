@@ -323,7 +323,7 @@ def get_securities_list():
 
     prev_path = latest_previous_snapshot(now)
     diffs = diff_snapshots(prev_path if prev_path != pq_path else "", df)
-
+    
     return 200
     # # Human-readable summary to stdout
     # print(f"Snapshot written:\n  {csv_path}\n  {pq_path}")
