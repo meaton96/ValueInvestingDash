@@ -1,6 +1,6 @@
 # scripts/setup_db.py
 from sqlalchemy import create_engine, text
-import os
+import os, traceback
 from dotenv import load_dotenv
 from datetime import date
 import pandas as pd
@@ -93,37 +93,44 @@ def acquire_lock(conn):
 def release_lock(conn):
     conn.execute(text("select pg_advisory_unlock(:k)"), {"k": ADVISORY_LOCK_KEY})
 
-def db_update() -> int:
+def db_update(df_in: pd.DataFrame) -> int:
+    t0 = time.time()
+    today = date.today()
+    
+
+    # Read CSV; avoid dtype guessing for CIK
+    df_raw = df_in  # other cols infer is fine
+
+    # Clean and validate
+    df = _clean_cik_column(df_raw)
+    df = _coerce_required_strings(df)
+    df = _trim_to_limits(df)
+
+    # Add dates
+    df["first_seen"] = today
+    df["last_seen"]  = today
+
+    acquired = False
     try:
-        t0 = time.time()
-        today = date.today()
-        csv_path = f"data/listings/security_master_{today.strftime('%Y-%m-%d')}.csv"
-
-        # Read CSV; avoid dtype guessing for CIK
-        df_raw = pd.read_csv(csv_path, dtype={"cik": "string"})  # other cols infer is fine
-
-        # Clean and validate
-        df = _clean_cik_column(df_raw)
-        df = _coerce_required_strings(df)
-        df = _trim_to_limits(df)
-
-        # Add dates
-        df["first_seen"] = today
-        df["last_seen"]  = today
-
         with engine.begin() as conn:
-            acquire_lock(conn)
-            conn.execute(text("select 1"))
+            if not acquire_lock(conn):
+                print("Another run is holding the lock; exiting.")
+                return 409
+            acquired = True
+
             ensure_schema(conn)
             dataframe_upsert(conn, df, chunk_size=1000)
+           # upsert_unresolved(conn, df_missing)
 
-        print(f"✅ {today} | read {len(df_raw)} rows, upserted {len(df)} "f"| {time.time()-t0:.1f}s")
+        print(f"✅ Upserted {len(df)} rows;")
         return 200
-    except Exception as e:
-        print(f"❌ Failed: {e}")
-        return 502
+    except Exception:
+        traceback.print_exc()
+        return 500
     finally:
-        release_lock(conn)
+        if acquired:
+            with engine.connect() as c:
+                release_lock(c)
 
 # if __name__ == "__main__":
 #     try:

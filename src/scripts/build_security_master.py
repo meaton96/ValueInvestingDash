@@ -10,6 +10,14 @@ import pandas as pd
 import requests
 import re
 from dotenv import load_dotenv
+import zoneinfo
+from pathlib import Path
+
+NY = zoneinfo.ZoneInfo("America/New_York")
+
+def get_repo_root() -> Path:
+    # src/scripts/... -> repo root
+    return Path(__file__).resolve().parents[2]
 
 load_dotenv()
 
@@ -204,79 +212,83 @@ def build_security_master() -> pd.DataFrame:
     a = load_nasdaqlisted()
     b = load_otherlisted()
 
-    # Some tickers appear in both feeds with slight differences.
-    # Prefer NASDAQ feed for NASDAQ exchange, otherwise prefer otherlisted.
-    # Strategy: concat, then keep first occurrence by ('symbol','exchange') priority.
-    # Give nasdaqlisted rows a higher priority sort key.
+    # Higher priority rows sort first
+    a["_prio"] = 0
+    b["_prio"] = 1
 
-    a['_prio'] = 0
-    b['_prio'] = 1
-
+    # Combine
     df = pd.concat([a, b], ignore_index=True)
 
-    exclude_mask = build_exclusion_mask(df["security_name"])
+    # Normalize early so dedupe is deterministic
+    df["symbol"] = df["symbol"].astype(str).str.upper().str.strip()
+    df["exchange"] = df["exchange"].astype(str).str.upper().str.strip()
+    df["security_name"] = df["security_name"].astype(str).str.strip()
 
-    df = df.sort_values(by=['symbol', '_prio']).drop_duplicates(subset=['symbol'], keep='first')
-    df = df.drop(columns=['_prio']) 
+    # Drop obvious junk symbols: whitespace or slash
+    df = df.loc[~df["symbol"].str.contains(r"[\s/]", na=False, regex=True)].copy()
 
-    
+    # Prefer NASDAQ feed when duplicates exist
+    df = (
+        df.sort_values(by=["symbol", "_prio"], kind="mergesort")
+          .drop_duplicates(subset=["symbol"], keep="first")
+          .drop(columns=["_prio"])
+    )
 
-    df["symbol"] = df["symbol"].str.upper().str.strip()
-    df = df[~df["symbol"].str.contains(r"[\s/]", na=False)]  # drop obvious junk
-
-    # attempt to remove ADR
+    # Remove ADRs and preferreds etc. Use non-capturing groups and explicit regex=True
     bad_name_patterns = r"(?i)\bADR\b|\bAmerican Depositary\b|Depositary Share|Preference|Preferred"
-    df = df[~df["security_name"].str.contains(bad_name_patterns, na=False)]
+    df = df.loc[~df["security_name"].str.contains(bad_name_patterns, na=False, regex=True)].copy()
 
-    
-    df = df[df["test_issue"] == False]         # exclude test issues
-    
-    # remove etf
-    df = df[df["etf"] == False]
+    # Exclude test issues and ETFs; coerce to boolean first
+    test_issue = df.get("test_issue")
+    if test_issue is not None:
+        df = df.loc[~test_issue.astype("boolean").fillna(False)].copy()
 
+    etf = df.get("etf")
+    if etf is not None:
+        df = df.loc[~etf.astype("boolean").fillna(False)].copy()
 
+    # Build exclusion mask AFTER all the above mutations so the index matches,
+    # or explicitly reindex to avoid the warning.
+    exclude_mask = build_exclusion_mask(df["security_name"]).reindex(df.index, fill_value=False)
 
-    # remove units, rights, warrants
-   # junk = r"(?i)\bUnit(s)?\b|\bRight(s)?\b|\bWarrant(s)?\b|\bOrdinary Share(s)? \w+? Pref"
-   # df = df[~df["security_name"].str.contains(junk, na=False)]
     before = len(df)
-    df = df[~exclude_mask].copy()
+    df = df.loc[~exclude_mask].copy()
     print(f"Filtered non-common instruments by name: {before - len(df)} removed")
 
-    # check for weird ticker lengths
-    too_long = ~df["symbol"].str.len().between(1, 7)  
-    if too_long.any():
-        print(f"Warning: {too_long.sum()} symbols have length outside 1..7; keeping them for now.")
-       # print(too_long.head())
+    # Sanity on ticker lengths (don’t filter, just warn)
+    too_long = ~df["symbol"].str.len().between(1, 7)
+    if bool(too_long.any()):
+        print(f"Warning: {int(too_long.sum())} symbols have length outside 1..7; keeping them for now.")
 
-    # adjust for y finance grab
+    # yfinance symbol: dot to dash (literal replace, not regex)
     df["symbol_yf"] = df["symbol"].str.replace(".", "-", regex=False)
 
-    # drop etf and test issue cols
-
-    df = df.drop(columns=['etf', 'test_issue'])
-    
+    # Drop columns we no longer need if present
+    drop_cols = [c for c in ["etf", "test_issue"] if c in df.columns]
+    if drop_cols:
+        df = df.drop(columns=drop_cols)
 
     # Stable sort for reproducibility
-    df = df.sort_values(["exchange", "symbol"]).reset_index(drop=True)
+    df = df.sort_values(["exchange", "symbol"], kind="mergesort").reset_index(drop=True)
 
+    # Duplicates should not exist at this point
     assert not df["symbol"].duplicated().any(), "Duplicate symbols snuck in"
 
     return df
+
 
 def snapshot_path(ts: datetime, ext: str = 'parquet') -> str:
     date_tag = ts.strftime('%Y-%m-%d')
     return os.path.join(OUT_DIR, f'security_master_{date_tag}.{ext}')
 
-def write_snapshot(df: pd.DataFrame, ts:datetime) -> Tuple[str, str]:
+def write_snapshot(df: pd.DataFrame, ts:datetime) -> str:
     csv_path = snapshot_path(ts, 'csv')
-    pq_path = snapshot_path(ts, 'parquet')
+ #   pq_path = snapshot_path(ts, 'parquet')
 
     df.to_csv(csv_path, index=False)
-    df.to_parquet(pq_path, index=False)
-
-    return csv_path, pq_path
-
+ #   df.to_parquet(pq_path, index=False)
+    print(f"Wrote {len(df)} rows to {csv_path}")
+    return csv_path
 def latest_previous_snapshot(now: datetime) -> str:
     files = sorted(p for p in os.listdir(OUT_DIR) if p.startswith("security_master_") and p.endswith(".parquet"))
     if not files:
@@ -315,7 +327,7 @@ def diff_snapshots(prev_path: str, curr_df: pd.DataFrame) -> Dict[str, pd.DataFr
     changed = merged.loc[changed_mask, [key] + sum(([f"{c}_prev", f"{c}_curr"] for c in compare_cols), [])]
     return {"added": added, "removed": removed, "changed": changed}
 
-def get_securities_list():
+def get_securities_list() -> pd.DataFrame:
     now = datetime.now(timezone.utc)
     df = build_security_master()
     df = enrich_with_cik(df)
@@ -323,8 +335,8 @@ def get_securities_list():
 
     prev_path = latest_previous_snapshot(now)
     diffs = diff_snapshots(prev_path if prev_path != pq_path else "", df)
-    
-    return 200
+
+    return df
     # # Human-readable summary to stdout
     # print(f"Snapshot written:\n  {csv_path}\n  {pq_path}")
     # print(f"Counts: total={len(df)} etf={int(df['etf'].sum())} test_issues={int(df['test_issue'].sum())}")

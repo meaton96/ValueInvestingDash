@@ -5,11 +5,10 @@ from src.scripts.update_db import db_update
 
 
 def run_pipeline():
-    status = get_securities_list()
-    if status == 200:
-        status = db_update()
-
-    print(f'status: {status}')
+     # get_securities_list now RETURNS the csv_path it wrote (or raises)
+    df = get_securities_list()
+    status = db_update(df)
+    print(f"status: {status}")
 
 if __name__ == "__main__":
     run_pipeline()

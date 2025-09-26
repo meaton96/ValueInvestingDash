@@ -21,10 +21,10 @@ jobs:
         env:
           DB_URI: ${{ secrets.DB_URI }}
           ADVISORY_LOCK_KEY: ${{ secrets.ADVISORY_LOCK_KEY }}
-          CONTACT_EMAIL : ${{ secrets.CONTACT_EMAIL }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           NAS_URL: ${{ secrets.NAS_URL }}
           OTHER_URL: ${{ secrets.OTHER_URL }}
-          SEC_TICKERS : ${{ secrets.SEC_TICKERS }}
+          SEC_TICKERS: ${{ secrets.SEC_TICKERS }}
 
         run: |
           . .venv/bin/activate
