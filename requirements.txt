@@ -1,6 +1,7 @@
 certifi==2025.8.3
 charset-normalizer==3.4.3
 dotenv==0.9.9
+fastapi==0.110.0
 greenlet==3.2.4
 idna==3.10
 numpy==2.3.3
@@ -17,3 +18,4 @@ SQLAlchemy==2.0.43
 typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
+uvicorn==0.30.1

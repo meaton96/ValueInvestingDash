@@ -79,7 +79,8 @@ def dataframe_upsert(conn, df: pd.DataFrame, chunk_size: int = 2000):
     for start in range(0, n, chunk_size):
         upsert_chunk(conn, records[start:start + chunk_size])
 
-if __name__ == "__main__":
+
+def db_update() -> int:
     try:
         today = date.today()
         csv_path = f"data/listings/security_master_{today.strftime('%Y-%m-%d')}.csv"
@@ -102,5 +103,33 @@ if __name__ == "__main__":
             dataframe_upsert(conn, df, chunk_size=1000)
 
         print(f"✅ Upserted {len(df)} rows into securities for {today.isoformat()}.")
+        return 200
     except Exception as e:
         print(f"❌ Failed: {e}")
+        return 502
+
+# if __name__ == "__main__":
+#     try:
+#         today = date.today()
+#         csv_path = f"data/listings/security_master_{today.strftime('%Y-%m-%d')}.csv"
+
+#         # Read CSV; avoid dtype guessing for CIK
+#         df = pd.read_csv(csv_path, dtype={"cik": "string"})  # other cols infer is fine
+
+#         # Clean and validate
+#         df = _clean_cik_column(df)
+#         df = _coerce_required_strings(df)
+#         df = _trim_to_limits(df)
+
+#         # Add dates
+#         df["first_seen"] = today
+#         df["last_seen"]  = today
+
+#         with engine.begin() as conn:
+#             conn.execute(text("select 1"))
+#             ensure_schema(conn)
+#             dataframe_upsert(conn, df, chunk_size=1000)
+
+#         print(f"✅ Upserted {len(df)} rows into securities for {today.isoformat()}.")
+#     except Exception as e:
+#         print(f"❌ Failed: {e}")

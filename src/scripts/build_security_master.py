@@ -315,7 +315,7 @@ def diff_snapshots(prev_path: str, curr_df: pd.DataFrame) -> Dict[str, pd.DataFr
     changed = merged.loc[changed_mask, [key] + sum(([f"{c}_prev", f"{c}_curr"] for c in compare_cols), [])]
     return {"added": added, "removed": removed, "changed": changed}
 
-def main():
+def get_securities_list():
     now = datetime.now(timezone.utc)
     df = build_security_master()
     df = enrich_with_cik(df)
@@ -324,22 +324,23 @@ def main():
     prev_path = latest_previous_snapshot(now)
     diffs = diff_snapshots(prev_path if prev_path != pq_path else "", df)
 
-    # Human-readable summary to stdout
-    print(f"Snapshot written:\n  {csv_path}\n  {pq_path}")
-    print(f"Counts: total={len(df)} etf={int(df['etf'].sum())} test_issues={int(df['test_issue'].sum())}")
-    if prev_path and os.path.abspath(prev_path) != os.path.abspath(pq_path):
-        print(f"\nCompared to previous: {os.path.basename(prev_path)}")
-        print(f"  Added:   {len(diffs['added'])}")
-        print(f"  Removed: {len(diffs['removed'])}")
-        print(f"  Changed: {len(diffs['changed'])}")
-        if len(diffs["added"]) > 0:
-            print("  Sample additions:", ", ".join(diffs["added"]["symbol"].head(10).tolist()))
-        if len(diffs["removed"]) > 0:
-            print("  Sample removals: ", ", ".join(diffs["removed"]["symbol"].head(10).tolist()))
+    return 200
+    # # Human-readable summary to stdout
+    # print(f"Snapshot written:\n  {csv_path}\n  {pq_path}")
+    # print(f"Counts: total={len(df)} etf={int(df['etf'].sum())} test_issues={int(df['test_issue'].sum())}")
+    # if prev_path and os.path.abspath(prev_path) != os.path.abspath(pq_path):
+    #     print(f"\nCompared to previous: {os.path.basename(prev_path)}")
+    #     print(f"  Added:   {len(diffs['added'])}")
+    #     print(f"  Removed: {len(diffs['removed'])}")
+    #     print(f"  Changed: {len(diffs['changed'])}")
+    #     if len(diffs["added"]) > 0:
+    #         print("  Sample additions:", ", ".join(diffs["added"]["symbol"].head(10).tolist()))
+    #     if len(diffs["removed"]) > 0:
+    #         print("  Sample removals: ", ", ".join(diffs["removed"]["symbol"].head(10).tolist()))
 
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"Failed: {e}", file=sys.stderr)
-        sys.exit(1)
+# if __name__ == "__main__":
+#     try:
+#         get_securities_list()
+#     except Exception as e:
+#         print(f"Failed: {e}", file=sys.stderr)
+#         sys.exit(1)

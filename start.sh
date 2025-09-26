@@ -1,0 +1,1 @@
+uvicorn app.api.get_data:app --reload --port 8000
