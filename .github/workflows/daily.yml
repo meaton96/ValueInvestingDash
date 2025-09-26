@@ -28,4 +28,4 @@ jobs:
 
         run: |
           . .venv/bin/activate
-          python scripts/pipeline.py
+          python src/scripts/pipeline.py
