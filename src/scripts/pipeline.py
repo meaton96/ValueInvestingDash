@@ -1,5 +1,7 @@
 from src.scripts.build_security_master import get_securities_list
-from src.scripts.setup_db import db_update
+from src.scripts.update_db import db_update
+
+
 
 
 def run_pipeline():

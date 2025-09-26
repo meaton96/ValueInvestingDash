@@ -5,10 +5,15 @@ from dotenv import load_dotenv
 from datetime import date
 import pandas as pd
 from math import ceil
+import time
 from src.db_scripts.securities import *
+
+ADVISORY_LOCK_KEY = 990656761
 
 load_dotenv()
 DB_URI = os.getenv("DB_URI") 
+
+
 if not DB_URI:
     raise ValueError("No DB_URI found in environment variables (DB_URI).")
 
@@ -79,17 +84,26 @@ def dataframe_upsert(conn, df: pd.DataFrame, chunk_size: int = 2000):
     for start in range(0, n, chunk_size):
         upsert_chunk(conn, records[start:start + chunk_size])
 
+        
+def acquire_lock(conn):
+    got = conn.execute(text("select pg_try_advisory_lock(:k)"), {"k": ADVISORY_LOCK_KEY}).scalar()
+    if not got:
+        raise RuntimeError("Another job is running (advisory lock busy).")
+
+def release_lock(conn):
+    conn.execute(text("select pg_advisory_unlock(:k)"), {"k": ADVISORY_LOCK_KEY})
 
 def db_update() -> int:
     try:
+        t0 = time.time()
         today = date.today()
         csv_path = f"data/listings/security_master_{today.strftime('%Y-%m-%d')}.csv"
 
         # Read CSV; avoid dtype guessing for CIK
-        df = pd.read_csv(csv_path, dtype={"cik": "string"})  # other cols infer is fine
+        df_raw = pd.read_csv(csv_path, dtype={"cik": "string"})  # other cols infer is fine
 
         # Clean and validate
-        df = _clean_cik_column(df)
+        df = _clean_cik_column(df_raw)
         df = _coerce_required_strings(df)
         df = _trim_to_limits(df)
 
@@ -98,15 +112,18 @@ def db_update() -> int:
         df["last_seen"]  = today
 
         with engine.begin() as conn:
+            acquire_lock(conn)
             conn.execute(text("select 1"))
             ensure_schema(conn)
             dataframe_upsert(conn, df, chunk_size=1000)
 
-        print(f"✅ Upserted {len(df)} rows into securities for {today.isoformat()}.")
+        print(f"✅ {today} | read {len(df_raw)} rows, upserted {len(df)} "f"| {time.time()-t0:.1f}s")
         return 200
     except Exception as e:
         print(f"❌ Failed: {e}")
         return 502
+    finally:
+        release_lock(conn)
 
 # if __name__ == "__main__":
 #     try:
