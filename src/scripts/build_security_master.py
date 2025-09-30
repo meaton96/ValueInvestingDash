@@ -331,9 +331,9 @@ def get_securities_list() -> pd.DataFrame:
     now = datetime.now(timezone.utc)
     df = build_security_master()
     df = enrich_with_cik(df)
-    csv_path = write_snapshot(df, now)
+    #csv_path = write_snapshot(df, now)
 
-    prev_path = latest_previous_snapshot(now)
+   # prev_path = latest_previous_snapshot(now)
    # diffs = diff_snapshots(prev_path if prev_path != pq_path else "", df)
 
     return df
