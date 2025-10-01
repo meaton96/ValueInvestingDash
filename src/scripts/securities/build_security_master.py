@@ -13,11 +13,12 @@ from dotenv import load_dotenv
 import zoneinfo
 from pathlib import Path
 
+
 NY = zoneinfo.ZoneInfo("America/New_York")
 
-def get_repo_root() -> Path:
-    # src/scripts/... -> repo root
-    return Path(__file__).resolve().parents[2]
+# def get_repo_root() -> Path:
+#     # src/scripts/... -> repo root
+#     return Path(__file__).resolve().parents[3]
 
 load_dotenv()
 
@@ -92,14 +93,14 @@ def first_exclusion_reason(name: str) -> str | None:
     return None
 
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "data", "listings")
-os.makedirs(OUT_DIR, exist_ok=True)
+# ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# OUT_DIR = os.path.join(ROOT, "data", "listings")
+# os.makedirs(OUT_DIR, exist_ok=True)
 
 
 def load_sec_company_tickers() -> pd.DataFrame:
     SEC_HEADERS = {
-    "User-Agent": "ValueInvestingDash/0.1 (Michael C. Eaton; me3870@rit.edu)",
+    "User-Agent": f"ValueInvestingDash/0.1 (Michael C. Eaton; {CONTACT_EMAIL})",
     "Accept": "application/json",
     "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
@@ -277,24 +278,24 @@ def build_security_master() -> pd.DataFrame:
     return df
 
 
-def snapshot_path(ts: datetime, ext: str = 'parquet') -> str:
-    date_tag = ts.strftime('%Y-%m-%d')
-    return os.path.join(OUT_DIR, f'security_master_{date_tag}.{ext}')
+# def snapshot_path(ts: datetime, ext: str = 'parquet') -> str:
+#     date_tag = ts.strftime('%Y-%m-%d')
+#     return os.path.join(OUT_DIR, f'security_master_{date_tag}.{ext}')
 
-def write_snapshot(df: pd.DataFrame, ts:datetime) -> str:
-    csv_path = snapshot_path(ts, 'csv')
- #   pq_path = snapshot_path(ts, 'parquet')
+# def write_snapshot(df: pd.DataFrame, ts:datetime) -> str:
+#     csv_path = snapshot_path(ts, 'csv')
+#  #   pq_path = snapshot_path(ts, 'parquet')
 
-    df.to_csv(csv_path, index=False)
- #   df.to_parquet(pq_path, index=False)
-    print(f"Wrote {len(df)} rows to {csv_path}")
-    return csv_path
-def latest_previous_snapshot(now: datetime) -> str:
-    files = sorted(p for p in os.listdir(OUT_DIR) if p.startswith("security_master_") and p.endswith(".parquet"))
-    if not files:
-        return ""
-    # choose the most recent prior to today if multiple exist
-    return os.path.join(OUT_DIR, files[-1])
+#     df.to_csv(csv_path, index=False)
+#  #   df.to_parquet(pq_path, index=False)
+#     print(f"Wrote {len(df)} rows to {csv_path}")
+#     return csv_path
+# def latest_previous_snapshot(now: datetime) -> str:
+#     files = sorted(p for p in os.listdir(OUT_DIR) if p.startswith("security_master_") and p.endswith(".parquet"))
+#     if not files:
+#         return ""
+#     # choose the most recent prior to today if multiple exist
+#     return os.path.join(OUT_DIR, files[-1])
 
 def _map_yn_bool(series: pd.Series | None) -> pd.Series:
     # Robust and quiet: treat anything == 'Y' (case-insensitive) as True, else False
