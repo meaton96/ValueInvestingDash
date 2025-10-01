@@ -2,7 +2,7 @@ CREATE_SQL = """
 create extension if not exists "pgcrypto";
 
 create table if not exists securities(
-    cik          bigint primary key,          -- widened from integer
+    cik          bigint primary key,          
     ticker       varchar(7)  not null,
     name         varchar(40) not null,
     exchange     varchar(15) not null,

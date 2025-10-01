@@ -6,7 +6,7 @@ from datetime import date
 import pandas as pd
 from math import ceil
 import time
-from src.db_scripts.securities import *
+from src.sql_scripts.securities import *
 
 
 
