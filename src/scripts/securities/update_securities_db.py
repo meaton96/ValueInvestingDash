@@ -7,6 +7,7 @@ import pandas as pd
 from math import ceil
 import time
 from src.sql_scripts.securities import *
+from src.scripts.utilities.upsert import dataframe_upsert
 
 
 
@@ -74,16 +75,6 @@ def _coerce_required_strings(df: pd.DataFrame) -> pd.DataFrame:
         df[c] = df[c].astype(str).str.strip()
     return df
 
-def upsert_chunk(conn, records):
-    if records:
-        conn.execute(text(UPSERT_SQL), records)
-
-def dataframe_upsert(conn, df: pd.DataFrame, chunk_size: int = 2000):
-    records = df.to_dict(orient="records")
-    n = len(records)
-    for start in range(0, n, chunk_size):
-        upsert_chunk(conn, records[start:start + chunk_size])
-
         
 def acquire_lock(conn) -> bool:
     got = conn.execute(
@@ -121,7 +112,7 @@ def db_update(df_in: pd.DataFrame) -> int:
             return 409
         try:
             ensure_schema(conn)
-            dataframe_upsert(conn, df, chunk_size=1000)
+            dataframe_upsert(conn, df, upsertSQL=UPSERT_SQL, chunk_size=1000)
         finally:
             release_lock(conn)
 

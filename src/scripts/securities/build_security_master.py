@@ -131,11 +131,13 @@ def _get(url: str) -> str:
     headers = {
         "User-Agent": "ValueInvestingDash/0.1 (+https://example.com; contact: you@example.com)"
     }
+    r = None
     for attempt in range(3):
         r = requests.get(url, headers=headers, timeout=30)
         if r.ok:
             return r.text
-    r.raise_for_status()
+    if r is not None:
+        r.raise_for_status() 
     return ""
 
 def _read_pipe_table(text: str) -> pd.DataFrame:
