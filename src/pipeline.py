@@ -16,6 +16,8 @@ def run_pipeline():
     response = getSECZips()
     if response['status'] != 200:
         return
+    print('Finished fetching data')
+    print('Parsing fundamentals zips')
     upsertFundamentals(response['cf_path'], response['sub_path'], df)
 
 
