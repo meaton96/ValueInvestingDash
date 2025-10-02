@@ -175,43 +175,12 @@ def download_zip(url: str, dest_path: str, max_retries: int = 5, sleep_s: float 
 
     return dest_path
 
-@contextmanager
-def open_zip(path: str):
-    zf = zipfile.ZipFile(path, "r")
-    try:
-        yield zf
-    finally:
-        zf.close()
 
 
-def stream_parse_zip_json(zip_path: str, json_suffix=".json", handler=None):
-    """
-    Iterate files inside ZIP without extracting.
-    Call handler(name: str, parsed_json: Any) per JSON file.
-    """
-    if handler is None:
-        handler = lambda name, obj: None
-
-    with open_zip(zip_path) as zf:
-        for name in zf.namelist():
-            if not name.endswith(json_suffix):
-                continue
-            with zf.open(name) as fp:
-                # Most SEC JSON is newline-delimited or big JSON. Try both.
-                raw = fp.read()
-                try:
-                    obj = json.loads(raw)
-                    handler(name, obj)
-                except json.JSONDecodeError:
-                    # fallback: NDJSON
-                    for line in raw.splitlines():
-                        if not line.strip():
-                            continue
-                        handler(name, json.loads(line))
 
 
-if __name__ == "__main__":
-    # grab both nightly SEC bulk zips
+
+def getSECZips():
     COMPANYFACTS = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
     SUBMISSIONS  = "https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip"
 
@@ -224,12 +193,24 @@ if __name__ == "__main__":
     print("Downloading submissions...")
     download_zip(SUBMISSIONS,  sub_path)
     print('finished downloading')
-    print('counting...')
 
-    count = 0
-    def _count_handler(_, __):
-        global count
-        count += 1
+    return {
+        'status' : 200,
+        'cf_path' : cf_path,
+        'sub_path': sub_path
+    }
+    # print('counting...')
 
-    stream_parse_zip_json(cf_path, handler=_count_handler)
-    print(f"companyfacts JSON files seen: {count}")
+    # count = 0
+    # def _count_handler(name, jsonObj):
+    #     nonlocal count
+    #     count += 1
+    #     if count % 1000 == 0:
+    #         print(name)
+
+    # stream_parse_zip_json(cf_path, handler=_count_handler)
+    # print(f"companyfacts JSON files seen: {count}")
+
+if __name__ == "__main__":
+    getSECZips()
+    
