@@ -1,5 +1,5 @@
 from src.scripts.securities.build_security_master import get_securities_list
-from src.scripts.securities.update_db import db_update
+from src.scripts.securities.update_securities_db import db_update
 
 
 
