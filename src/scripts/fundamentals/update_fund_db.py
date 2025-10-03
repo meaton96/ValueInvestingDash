@@ -114,24 +114,17 @@ def stream_parse_zip_json(securities_df: pd.DataFrame, zip_path: str, json_suffi
             with zf.open(name) as fp:
                 raw = fp.read()
                 # Pass raw bytes; let the handler/extractor decide how to parse
-                handler(name, raw)
+                handler(cik_int, raw)
 
 count = 0
 
-count = 0
-
-def handleDfInsert(name: str, raw_or_obj):
+def handleDfInsert(cik_int: int, raw_or_obj):
     """Parse one JSON from the ZIP, extract rows, and append to global fund_master_df."""
     global count, fund_master_df
     count += 1
 
-    # Parse CIK from filename like "CIK0000320193.json"
-    try:
-        cik = int(name.split('.')[0].replace("CIK", ""))
-    except Exception:
-        return
-
-    rows = extract_rows_from_json(cik, raw_or_obj)
+    
+    rows = extract_rows_from_json(cik_int, raw_or_obj)
     if not rows:
         return
 
