@@ -23,30 +23,30 @@ from src.sql_scripts.fundamentals import *
 
 
 
-# -----------------------------
-# Configuration
-# -----------------------------
+# # -----------------------------
+# # Configuration
+# # -----------------------------
 
 
-# Canonical metrics we care about and acceptable tag synonyms.
-# Map canonical_name -> list of XBRL tag candidates (ordered by preference).
-TAG_MAP: Dict[str, List[str]] = {
-    "AssetsCurrent": ["AssetsCurrent"],
-    "LiabilitiesCurrent": ["LiabilitiesCurrent"],
-    "Liabilities": ["Liabilities"],
-    "StockholdersEquity": [
-    "StockholdersEquity",
-    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
-    ],
-    "EarningsPerShare": ["EarningsPerShareDiluted", "EarningsPerShareBasic"],
-    "NetIncomeLoss": ["NetIncomeLoss", "ProfitLoss"],
-    "OperatingCashFlow": ["NetCashProvidedByUsedInOperatingActivities"],
-    "DividendsPerShare": ["CommonStockDividendsPerShareDeclared"],
-    "DividendsPaidCash": ["PaymentsOfDividendsCommonStock"],
-    "SharesOutstanding": ["CommonStockSharesOutstanding"],
-    "DebtCurrent": ["DebtCurrent"],
-    "DebtNoncurrent": ["DebtNoncurrent"],
-}
+# # Canonical metrics we care about and acceptable tag synonyms.
+# # Map canonical_name -> list of XBRL tag candidates (ordered by preference).
+# TAG_MAP: Dict[str, List[str]] = {
+#     "AssetsCurrent": ["AssetsCurrent"],
+#     "LiabilitiesCurrent": ["LiabilitiesCurrent"],
+#     "Liabilities": ["Liabilities"],
+#     "StockholdersEquity": [
+#     "StockholdersEquity",
+#     "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+#     ],
+#     "EarningsPerShare": ["EarningsPerShareDiluted", "EarningsPerShareBasic"],
+#     "NetIncomeLoss": ["NetIncomeLoss", "ProfitLoss"],
+#     "OperatingCashFlow": ["NetCashProvidedByUsedInOperatingActivities"],
+#     "DividendsPerShare": ["CommonStockDividendsPerShareDeclared"],
+#     "DividendsPaidCash": ["PaymentsOfDividendsCommonStock"],
+#     "SharesOutstanding": ["CommonStockSharesOutstanding"],
+#     "DebtCurrent": ["DebtCurrent"],
+#     "DebtNoncurrent": ["DebtNoncurrent"],
+# }
 
 
 load_dotenv()
@@ -78,37 +78,37 @@ def _get_etag_or_mtime(headers):
 def _resume_range(path):
     return os.path.getsize(path) if os.path.exists(path) else 0
 
-# Unit normalization: convert USD variants to plain USD, shares to shares.
-# SEC units often appear as 'USD', 'USDm', 'USDth', etc.
+# # Unit normalization: convert USD variants to plain USD, shares to shares.
+# # SEC units often appear as 'USD', 'USDm', 'USDth', etc.
 
 
-def normalize_value_unit(value, unit: str) -> Tuple[float | None, str]:
-    if value is None:
-        return None, unit
-    try:
-        v = float(value)
-    except Exception:
-        return None, unit
+# def normalize_value_unit(value, unit: str) -> Tuple[float | None, str]:
+#     if value is None:
+#         return None, unit
+#     try:
+#         v = float(value)
+#     except Exception:
+#         return None, unit
 
 
-    unit_norm = unit
-    if unit.upper().startswith("USD"):
-        # Scale to USD
-        suffix = unit.upper()[3:]
-        if suffix == "M":
-            v *= 1_000_000
-        elif suffix in ("MM", "MN"): 
-            v *= 1_000_000
-        elif suffix in ("B", "BN"):
-            v *= 1_000_000_000
-        elif suffix in ("TH", "THS", "THOUSANDS"):
-            v *= 1_000
-        unit_norm = "USD"
-    elif unit.lower() in ("shares", "shrs"):
-        unit_norm = "shares"
+#     unit_norm = unit
+#     if unit.upper().startswith("USD"):
+#         # Scale to USD
+#         suffix = unit.upper()[3:]
+#         if suffix == "M":
+#             v *= 1_000_000
+#         elif suffix in ("MM", "MN"): 
+#             v *= 1_000_000
+#         elif suffix in ("B", "BN"):
+#             v *= 1_000_000_000
+#         elif suffix in ("TH", "THS", "THOUSANDS"):
+#             v *= 1_000
+#         unit_norm = "USD"
+#     elif unit.lower() in ("shares", "shrs"):
+#         unit_norm = "shares"
 
 
-    return v, unit_norm
+#     return v, unit_norm
 
 
 def download_zip(url: str, dest_path: str, max_retries: int = 5, sleep_s: float = 2.0) -> str:

@@ -13,6 +13,8 @@ def run_pipeline():
         return
     print(f'Securities DB Updated')
     print('fetching fundamentals data')
+    
+    df.to_csv('data/temp/temp_sec_table.csv')
     response = getSECZips()
     if response['status'] != 200:
         return
