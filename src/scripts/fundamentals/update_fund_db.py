@@ -8,6 +8,8 @@ from typing import Dict, List, Tuple, Iterable
 from pathlib import Path
 import orjson as jsonlib
 import time
+import os
+from dotenv import load_dotenv
 
 # -----------------------------
 # Configuration
@@ -18,7 +20,7 @@ FUND_COLS = [
     "tag", "value", "unit", "frame"
 ]
 fund_master_df = pd.DataFrame(columns=FUND_COLS)
-
+load_dotenv()
 
 # Canonical metrics we care about and acceptable tag synonyms.
 # Map canonical_name -> list of XBRL tag candidates (ordered by preference).
@@ -156,15 +158,15 @@ def upsertFundamentals(cf_path : str, sub_path: str, securities_df: pd.DataFrame
 
     return time.perf_counter() - start_time
 
-def iter_companyfacts_json(path: Path) -> Iterable[Tuple[int, bytes]]:
-    """Yield (cik, file_bytes) for each CIK JSON file under path."""
-    for p in path.glob("CIK*.json"):
-        # File names look like CIK0000320193.json
-        try:
-            cik = int(p.stem.replace("CIK", ""))
-        except Exception:
-            continue
-        yield cik, p.read_bytes()
+# def iter_companyfacts_json(path: Path) -> Iterable[Tuple[int, bytes]]:
+#     """Yield (cik, file_bytes) for each CIK JSON file under path."""
+#     for p in path.glob("CIK*.json"):
+#         # File names look like CIK0000320193.json
+#         try:
+#             cik = int(p.stem.replace("CIK", ""))
+#         except Exception:
+#             continue
+#         yield cik, p.read_bytes()
 
 
 
@@ -249,11 +251,12 @@ def extract_rows_from_json(cik: int, buf_or_obj) -> List[Tuple]:
 
 
 if __name__ == '__main__':
+    SEC_DL_DIR = os.getenv('SEC_DL_DIR')
     time_taken = upsertFundamentals(
-        'data/fundamentals/companyfacts.zip',
-        'data/fundamentals/submissions.zip',
+        f'{SEC_DL_DIR}/companyfacts.zip',
+        f'{SEC_DL_DIR}/submissions.zip',
         pd.read_csv('data/temp/temp_sec_table.csv'),
-        1000
+        100
     )
 
     print(f'upsert took: {time_taken:.4f} seconds')
