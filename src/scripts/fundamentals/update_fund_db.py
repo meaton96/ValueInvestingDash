@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Dict, List, Tuple, Iterable
 from pathlib import Path
 import orjson as jsonlib
+import time
 
 # -----------------------------
 # Configuration
@@ -92,6 +93,8 @@ def stream_parse_zip_json(securities_df: pd.DataFrame, zip_path: str, json_suffi
     stop_early_count = 0
     with open_zip(zip_path) as zf:
         for name in zf.namelist():
+            if (skipCount + count) % 100 == 0:
+                print(f'file: {skipCount + count}')
             if not name.endswith(json_suffix):
                 continue
 
@@ -136,9 +139,9 @@ def handleDfInsert(cik_int: int, raw_or_obj):
     else:
         fund_master_df = pd.concat([fund_master_df, df_add], ignore_index=True)
 
-def upsertFundamentals(cf_path : str, sub_path: str, securities_df: pd.DataFrame, stop_early = 0):
+def upsertFundamentals(cf_path : str, sub_path: str, securities_df: pd.DataFrame, stop_early = 0) -> float:
 
-   
+    start_time = time.perf_counter()
     stream_parse_zip_json(
         securities_df=securities_df,
         zip_path=cf_path,
@@ -146,10 +149,12 @@ def upsertFundamentals(cf_path : str, sub_path: str, securities_df: pd.DataFrame
         stop_early=stop_early)
     print(f'looked at: {count} json files')
     print(f'skipped {skipCount} json files')
-    print(fund_master_df.head())
-    print(fund_master_df['tag'].value_counts())
+  #  print(fund_master_df.head())
+   # print(fund_master_df['tag'].value_counts())
     print(f"rows collected: {len(fund_master_df)}")
-    return
+    # print(fund_master_df.columns)
+
+    return time.perf_counter() - start_time
 
 def iter_companyfacts_json(path: Path) -> Iterable[Tuple[int, bytes]]:
     """Yield (cik, file_bytes) for each CIK JSON file under path."""
@@ -244,11 +249,12 @@ def extract_rows_from_json(cik: int, buf_or_obj) -> List[Tuple]:
 
 
 if __name__ == '__main__':
-    upsertFundamentals(
-        'data/sec/companyfacts.zip',
-        'data/sec/submissions.zip',
+    time_taken = upsertFundamentals(
+        'data/fundamentals/companyfacts.zip',
+        'data/fundamentals/submissions.zip',
         pd.read_csv('data/temp/temp_sec_table.csv'),
-        2
-
+        1000
     )
+
+    print(f'upsert took: {time_taken:.4f} seconds')
     
