@@ -1,11 +1,7 @@
-import psycopg
-from zipfile import ZipFile
-import json
 import pandas as pd
 import zipfile
 from contextlib import contextmanager
-from typing import Dict, List, Tuple, Iterable
-from pathlib import Path
+from typing import Dict, List, Tuple
 import orjson as jsonlib
 import time
 import os
@@ -151,22 +147,13 @@ def upsertFundamentals(cf_path : str, sub_path: str, securities_df: pd.DataFrame
         stop_early=stop_early)
     print(f'looked at: {count} json files')
     print(f'skipped {skipCount} json files')
-  #  print(fund_master_df.head())
+    print(fund_master_df.head())
    # print(fund_master_df['tag'].value_counts())
     print(f"rows collected: {len(fund_master_df)}")
     # print(fund_master_df.columns)
 
     return time.perf_counter() - start_time
 
-# def iter_companyfacts_json(path: Path) -> Iterable[Tuple[int, bytes]]:
-#     """Yield (cik, file_bytes) for each CIK JSON file under path."""
-#     for p in path.glob("CIK*.json"):
-#         # File names look like CIK0000320193.json
-#         try:
-#             cik = int(p.stem.replace("CIK", ""))
-#         except Exception:
-#             continue
-#         yield cik, p.read_bytes()
 
 
 
@@ -235,19 +222,6 @@ def extract_rows_from_json(cik: int, buf_or_obj) -> List[Tuple]:
                 rows.append((cik, accn, fy, fp, tag_found, val, unit_norm, frame))
 
     return rows
-
-# build data frame from XRLB data
-# parse each json for info and make rows
-# upsert to db
-
-# def upsert_companyfacts_from_zip(zip_path: str, conn_str: str):
-#     with psycopg.connect(conn_str, autocommit=True) as conn, ZipFile(zip_path) as zf:
-#         with conn.cursor() as cur:
-#             for name in zf.namelist():
-#                 if not name.endswith(".json"): 
-#                     continue
-#                 with zf.open(name) as fp:
-#                     data = json.load(fp)
 
 
 if __name__ == '__main__':
