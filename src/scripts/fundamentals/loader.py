@@ -13,7 +13,7 @@ from src.scripts.utilities.zip import open_zip
 from src.sql_scripts.fundamentals import *
 from src.scripts.fundamentals.config import FUND_COLS, DATABASE_URL, TAG_MAP, CHUNK_ROWS,SEC_DL_DIR
 from src.scripts.fundamentals.json import extract_rows_from_json
-
+from src.scripts.fundamentals.ledger import *
 
 
 def ensure_tables(conn: psycopg.Connection):
@@ -53,68 +53,88 @@ def upsert_from_staging(conn: psycopg.Connection):
 # ZIP streaming with chunked DB writes
 # -----------------------------
 
-def stream_parse_zip_json(
-    conn: psycopg.Connection,
-    zip_path: str,
-    valid_ciks: set[int],
-    stop_early: int = 0,
-):
-    row_buffer: List[Tuple] = []
-    looked = skipped = matched = 0
-
+def stream_parse_zip_json(conn: psycopg.Connection, zip_path: str, valid_ciks: set[int], stop_early: int = 0):
+    source_kind = "companyfacts"
+    # 0) build meta list for all valid CIK members
+    metas = []
     with open_zip(zip_path) as zf:
         for name in zf.namelist():
-            # Only interested in files like 'CIK0000320193.json'
             if not name.endswith(".json") or not name.startswith("CIK"):
                 continue
-
-            looked += 1
-            if looked % 200 == 0:
-                print(f"Scanned {looked} files... matched {matched}, skipped {skipped}")
-
+            cik_str = name.split(".")[0][3:]
             try:
-                cik_str = name.split(".")[0][3:]
                 cik_int = int(cik_str)
             except Exception:
-                skipped += 1
                 continue
-
             if cik_int not in valid_ciks:
-                skipped += 1
-                if stop_early and (looked >= stop_early):
-                    break
                 continue
-
-            # matched; parse and buffer
-            matched += 1
-            with zf.open(name) as fp:
-                raw = fp.read()
-                rows = extract_rows_from_json(cik_int, raw, source_file=name, TAG_MAP=TAG_MAP)
-                if not rows:
-                    continue
-
-                # filter out rows without filing_date; if you prefer, allow NULL and coalesce later
-                filtered = [
-                    r for r in rows
-                    if r[8] is not None  # filing_date position in FUND_COLS
-                ]
-                row_buffer.extend(filtered)
-
-                if len(row_buffer) >= CHUNK_ROWS:
-                    copy_rows_to_staging(conn, row_buffer)
-                    upsert_from_staging(conn)
-                    row_buffer.clear()
-
-            if stop_early and (matched >= stop_early):
+            zi = zf.getinfo(name)
+            # zip info → meta
+            lm = datetime(*zi.date_time).replace(tzinfo=timezone.utc)
+            metas.append({
+                "natural_key": cik_str,
+                "asset_path": name,
+                "byte_size": zi.file_size,
+                "crc32": zi.CRC,
+                "sha256": None,
+                "last_modified": lm,
+                "etag": None,
+            })
+            if stop_early and len(metas) >= stop_early:
                 break
 
-    # flush tail
+    if not metas:
+        print("No matching CIKs found.")
+        return
+
+    # 1) one round-trip to fetch prior ledger state
+    prior = ledger_bulk_get(conn, source_kind, [m["natural_key"] for m in metas])
+
+    # 2) decide which changed
+    def is_changed(m, p):
+        if p is None: return True
+        return (
+            m["asset_path"] != p.get("asset_path") or
+            m["byte_size"]  != p.get("byte_size")  or
+            m["crc32"]      != p.get("crc32")      or
+            m["last_modified"] != p.get("last_modified")
+        )
+
+    changed = [m for m in metas if is_changed(m, prior.get(m["natural_key"]))]
+    unchanged = len(metas) - len(changed)
+
+    print(f"Candidates: {len(metas)} | Changed: {len(changed)} | Unchanged: {unchanged}")
+
+    # 3) parse only changed; stage + upsert in chunks
+    row_buffer: list[Tuple] = []
+    filing_date_idx = FUND_COLS.index("filing_date")
+
+    with open_zip(zip_path) as zf:
+        for m in changed:
+            name = m["asset_path"]
+            cik_int = int(m["natural_key"])
+            with zf.open(name) as fp:
+                raw = fp.read()
+            rows = extract_rows_from_json(cik_int, raw, source_file=name, TAG_MAP=TAG_MAP)
+            rows = [r for r in rows if r[filing_date_idx] is not None]
+            if rows:
+                row_buffer.extend(rows)
+            if len(row_buffer) >= CHUNK_ROWS:
+                copy_rows_to_staging(conn, row_buffer)
+                upsert_from_staging(conn)
+                row_buffer.clear()
+
     if row_buffer:
         copy_rows_to_staging(conn, row_buffer)
         upsert_from_staging(conn)
         row_buffer.clear()
 
-    print(f"Done. Looked: {looked}, matched: {matched}, skipped: {skipped}")
+    # 4) one batch upsert to ledger for changed only; single commit after
+    ledger_bulk_upsert(conn, source_kind, changed, status="ok")
+    conn.commit()
+
+    print(f"Loaded {len(changed)} changed CIKs; skipped parsing {unchanged}.")
+
 
 
 

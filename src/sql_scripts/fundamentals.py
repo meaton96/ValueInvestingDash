@@ -44,3 +44,25 @@ ON CONFLICT (cik, accession_no, tag, frame) DO NOTHING;
 """
 
 TRUNCATE_STAGING = "TRUNCATE staging_fundamentals;"
+
+LEDGER_SELECT = """
+SELECT source_kind, natural_key, asset_path, byte_size, crc32, sha256, last_modified, etag, processed_at, status
+FROM etl_source_ledger
+WHERE source_kind = %s AND natural_key = %s
+"""
+
+LEDGER_UPSERT = """
+INSERT INTO etl_source_ledger
+  (source_kind, natural_key, asset_path, byte_size, crc32, sha256, last_modified, etag, processed_at, status)
+VALUES
+  (%s, %s, %s, %s, %s, %s, %s, %s, now(), %s)
+ON CONFLICT (source_kind, natural_key) DO UPDATE
+SET asset_path    = EXCLUDED.asset_path,
+    byte_size     = EXCLUDED.byte_size,
+    crc32         = EXCLUDED.crc32,
+    sha256        = EXCLUDED.sha256,
+    last_modified = EXCLUDED.last_modified,
+    etag          = EXCLUDED.etag,
+    processed_at  = now(),
+    status        = EXCLUDED.status
+"""
