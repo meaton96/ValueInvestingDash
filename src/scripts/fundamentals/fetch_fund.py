@@ -23,30 +23,30 @@ from src.sql_scripts.fundamentals import *
 
 
 
-# -----------------------------
-# Configuration
-# -----------------------------
+# # -----------------------------
+# # Configuration
+# # -----------------------------
 
 
-# Canonical metrics we care about and acceptable tag synonyms.
-# Map canonical_name -> list of XBRL tag candidates (ordered by preference).
-TAG_MAP: Dict[str, List[str]] = {
-    "AssetsCurrent": ["AssetsCurrent"],
-    "LiabilitiesCurrent": ["LiabilitiesCurrent"],
-    "Liabilities": ["Liabilities"],
-    "StockholdersEquity": [
-    "StockholdersEquity",
-    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
-    ],
-    "EarningsPerShare": ["EarningsPerShareDiluted", "EarningsPerShareBasic"],
-    "NetIncomeLoss": ["NetIncomeLoss", "ProfitLoss"],
-    "OperatingCashFlow": ["NetCashProvidedByUsedInOperatingActivities"],
-    "DividendsPerShare": ["CommonStockDividendsPerShareDeclared"],
-    "DividendsPaidCash": ["PaymentsOfDividendsCommonStock"],
-    "SharesOutstanding": ["CommonStockSharesOutstanding"],
-    "DebtCurrent": ["DebtCurrent"],
-    "DebtNoncurrent": ["DebtNoncurrent"],
-}
+# # Canonical metrics we care about and acceptable tag synonyms.
+# # Map canonical_name -> list of XBRL tag candidates (ordered by preference).
+# TAG_MAP: Dict[str, List[str]] = {
+#     "AssetsCurrent": ["AssetsCurrent"],
+#     "LiabilitiesCurrent": ["LiabilitiesCurrent"],
+#     "Liabilities": ["Liabilities"],
+#     "StockholdersEquity": [
+#     "StockholdersEquity",
+#     "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+#     ],
+#     "EarningsPerShare": ["EarningsPerShareDiluted", "EarningsPerShareBasic"],
+#     "NetIncomeLoss": ["NetIncomeLoss", "ProfitLoss"],
+#     "OperatingCashFlow": ["NetCashProvidedByUsedInOperatingActivities"],
+#     "DividendsPerShare": ["CommonStockDividendsPerShareDeclared"],
+#     "DividendsPaidCash": ["PaymentsOfDividendsCommonStock"],
+#     "SharesOutstanding": ["CommonStockSharesOutstanding"],
+#     "DebtCurrent": ["DebtCurrent"],
+#     "DebtNoncurrent": ["DebtNoncurrent"],
+# }
 
 
 load_dotenv()
@@ -78,37 +78,37 @@ def _get_etag_or_mtime(headers):
 def _resume_range(path):
     return os.path.getsize(path) if os.path.exists(path) else 0
 
-# Unit normalization: convert USD variants to plain USD, shares to shares.
-# SEC units often appear as 'USD', 'USDm', 'USDth', etc.
+# # Unit normalization: convert USD variants to plain USD, shares to shares.
+# # SEC units often appear as 'USD', 'USDm', 'USDth', etc.
 
 
-def normalize_value_unit(value, unit: str) -> Tuple[float | None, str]:
-    if value is None:
-        return None, unit
-    try:
-        v = float(value)
-    except Exception:
-        return None, unit
+# def normalize_value_unit(value, unit: str) -> Tuple[float | None, str]:
+#     if value is None:
+#         return None, unit
+#     try:
+#         v = float(value)
+#     except Exception:
+#         return None, unit
 
 
-    unit_norm = unit
-    if unit.upper().startswith("USD"):
-        # Scale to USD
-        suffix = unit.upper()[3:]
-        if suffix == "M":
-            v *= 1_000_000
-        elif suffix in ("MM", "MN"): 
-            v *= 1_000_000
-        elif suffix in ("B", "BN"):
-            v *= 1_000_000_000
-        elif suffix in ("TH", "THS", "THOUSANDS"):
-            v *= 1_000
-        unit_norm = "USD"
-    elif unit.lower() in ("shares", "shrs"):
-        unit_norm = "shares"
+#     unit_norm = unit
+#     if unit.upper().startswith("USD"):
+#         # Scale to USD
+#         suffix = unit.upper()[3:]
+#         if suffix == "M":
+#             v *= 1_000_000
+#         elif suffix in ("MM", "MN"): 
+#             v *= 1_000_000
+#         elif suffix in ("B", "BN"):
+#             v *= 1_000_000_000
+#         elif suffix in ("TH", "THS", "THOUSANDS"):
+#             v *= 1_000
+#         unit_norm = "USD"
+#     elif unit.lower() in ("shares", "shrs"):
+#         unit_norm = "shares"
 
 
-    return v, unit_norm
+#     return v, unit_norm
 
 
 def download_zip(url: str, dest_path: str, max_retries: int = 5, sleep_s: float = 2.0) -> str:
@@ -175,43 +175,12 @@ def download_zip(url: str, dest_path: str, max_retries: int = 5, sleep_s: float 
 
     return dest_path
 
-@contextmanager
-def open_zip(path: str):
-    zf = zipfile.ZipFile(path, "r")
-    try:
-        yield zf
-    finally:
-        zf.close()
 
 
-def stream_parse_zip_json(zip_path: str, json_suffix=".json", handler=None):
-    """
-    Iterate files inside ZIP without extracting.
-    Call handler(name: str, parsed_json: Any) per JSON file.
-    """
-    if handler is None:
-        handler = lambda name, obj: None
-
-    with open_zip(zip_path) as zf:
-        for name in zf.namelist():
-            if not name.endswith(json_suffix):
-                continue
-            with zf.open(name) as fp:
-                # Most SEC JSON is newline-delimited or big JSON. Try both.
-                raw = fp.read()
-                try:
-                    obj = json.loads(raw)
-                    handler(name, obj)
-                except json.JSONDecodeError:
-                    # fallback: NDJSON
-                    for line in raw.splitlines():
-                        if not line.strip():
-                            continue
-                        handler(name, json.loads(line))
 
 
-if __name__ == "__main__":
-    # grab both nightly SEC bulk zips
+
+def getSECZips():
     COMPANYFACTS = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
     SUBMISSIONS  = "https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip"
 
@@ -224,12 +193,24 @@ if __name__ == "__main__":
     print("Downloading submissions...")
     download_zip(SUBMISSIONS,  sub_path)
     print('finished downloading')
-    print('counting...')
 
-    count = 0
-    def _count_handler(_, __):
-        global count
-        count += 1
+    return {
+        'status' : 200,
+        'cf_path' : cf_path,
+        'sub_path': sub_path
+    }
+    # print('counting...')
 
-    stream_parse_zip_json(cf_path, handler=_count_handler)
-    print(f"companyfacts JSON files seen: {count}")
+    # count = 0
+    # def _count_handler(name, jsonObj):
+    #     nonlocal count
+    #     count += 1
+    #     if count % 1000 == 0:
+    #         print(name)
+
+    # stream_parse_zip_json(cf_path, handler=_count_handler)
+    # print(f"companyfacts JSON files seen: {count}")
+
+if __name__ == "__main__":
+    getSECZips()
+    

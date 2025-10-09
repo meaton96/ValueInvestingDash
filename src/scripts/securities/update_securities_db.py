@@ -7,7 +7,10 @@ import pandas as pd
 from math import ceil
 import time
 from src.sql_scripts.securities import *
+from src.sql_scripts.logs import *
 from src.scripts.utilities.upsert import dataframe_upsert
+from typing import Tuple
+from datetime import datetime
 
 
 
@@ -32,7 +35,7 @@ def _trim_to_limits(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].astype(str).str.strip().str.slice(0, lim)
     return df
 
-def _clean_cik_column(df: pd.DataFrame) -> pd.DataFrame:
+def _clean_cik_column(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
     # Treat as string first to avoid float nonsense from CSV like "1374310.0"
     if "cik" not in df.columns:
         raise ValueError("CSV missing required column 'cik'")
@@ -52,15 +55,17 @@ def _clean_cik_column(df: pd.DataFrame) -> pd.DataFrame:
 
     # Range filter for sanity (CIK max 10 digits)
     bad_mask = df["cik"].isna() | (df["cik"] < 1) | (df["cik"] > 9_999_999_999)
+    note: str = ""
     if bad_mask.any():
        # bad_rows = df.loc[bad_mask, ["cik"] + [c for c in df.columns if c != "cik"]].head(10)
-        print(f"⚠️ Skipping {bad_mask.sum()} rows with invalid CIK.")
+        note = f"{bad_mask.sum()} rows with invalid CIK."
+        print()
         df = df.loc[~bad_mask]
 
     # Convert to Python int so the driver binds as integer, not float
     df["cik"] = df["cik"].astype("Int64").astype(object).apply(lambda x: int(x))
 
-    return df
+    return df, note
 
 def _coerce_required_strings(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns={
@@ -89,8 +94,27 @@ def release_lock(conn) -> None:
         {"k": ADVISORY_LOCK_KEY}
     )
 
+def update_log(error_msg: str,
+               t0: datetime,
+               t1: datetime,
+               status: str,
+               notes: str,
+               conn):
+    conn.execute(
+        text(LOG_UPLOAD_ALCH),
+        {
+            "pipeline_name": "securities_loader",
+            "time_start": t0,
+            "time_end": t1,
+            "status": status,
+            "errors": (error_msg or None),
+            "notes": (notes or None),
+        },
+    )
+    print("posted daily log")
+
 def db_update(df_in: pd.DataFrame) -> int:
-    t0 = time.time()
+    t0 = datetime.now()
     today = date.today()
     
 
@@ -98,7 +122,7 @@ def db_update(df_in: pd.DataFrame) -> int:
     df_raw = df_in  
 
     # Clean and validate
-    df = _clean_cik_column(df_raw)
+    df, notes = _clean_cik_column(df_raw)
     df = _coerce_required_strings(df)
     df = _trim_to_limits(df)
 
@@ -109,13 +133,36 @@ def db_update(df_in: pd.DataFrame) -> int:
     with engine.begin() as conn:
         if not acquire_lock(conn):
             print("Another run is holding the lock; exiting.")
+            update_log(
+            error_msg="Another run is holding the lock",
+            t0=t0,
+            t1=datetime.now(),
+            conn=conn,
+            status='409',
+            notes="pipeline did not run"
+            )
+
             return 409
         try:
             ensure_schema(conn)
             dataframe_upsert(conn, df, upsertSQL=UPSERT_SQL, chunk_size=1000)
+            
+
         finally:
+            t1 = datetime.now()
+
+            update_log(
+                    error_msg="",
+                    t0=t0,
+                    t1=t1,
+                    conn=conn,
+                    status='ok',
+                    notes=notes,
+                    )
             release_lock(conn)
 
-    print(f"✅ Upserted {len(df)} rows; in {time.time() - t0:.2f}s")
+    
+
+
     return 200
 
