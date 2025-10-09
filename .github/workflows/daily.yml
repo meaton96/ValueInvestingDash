@@ -25,6 +25,7 @@ jobs:
           NAS_URL: ${{ secrets.NAS_URL }}
           OTHER_URL: ${{ secrets.OTHER_URL }}
           SEC_TICKERS: ${{ secrets.SEC_TICKERS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
         run: |
           . .venv/bin/activate
