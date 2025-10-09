@@ -1,7 +1,7 @@
 import argparse
 
 from src.scripts.fundamentals.fetch_fund import getSECZips
-from src.scripts.fundamentals.update_fund_db import upsertFundamentals
+from src.scripts.fundamentals.loader import upsert_fundamentals
 from src.scripts.securities.build_security_master import get_securities_list
 from src.scripts.securities.update_securities_db import db_update
 
@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
         "--write-csv",
         dest="write_csv",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Control whether the securities table snapshot is written to 'data/temp/temp_sec_table.csv'.",
     )
 
@@ -40,12 +40,12 @@ def run_pipeline(write_csv: bool = False) -> None:
     else:
         print("Skipping securities CSV snapshot (write_csv disabled)")
 
-    # response = getSECZips()
-    # if response["status"] != 200:
-    #     return
-    # print("Finished fetching data")
-    # print("Parsing fundamentals zips")
-    # upsertFundamentals(response["cf_path"], response["sub_path"], df)
+    response = getSECZips()
+    if response["status"] != 200:
+        return
+    print("Finished fetching data")
+    print("Parsing fundamentals zips")
+    upsert_fundamentals(response["cf_path"], df)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from psycopg.rows import tuple_row
 
 from src.scripts.utilities.zip import open_zip
 from src.sql_scripts.fundamentals import *
+from src.sql_scripts.logs import LOG_UPLOAD_PG
 from src.scripts.fundamentals.config import FUND_COLS, DATABASE_URL, TAG_MAP, CHUNK_ROWS,SEC_DL_DIR
 from src.scripts.fundamentals.json import extract_rows_from_json
 from src.scripts.fundamentals.ledger import *
@@ -53,7 +54,10 @@ def upsert_from_staging(conn: psycopg.Connection):
 # ZIP streaming with chunked DB writes
 # -----------------------------
 
-def stream_parse_zip_json(conn: psycopg.Connection, zip_path: str, valid_ciks: set[int], stop_early: int = 0):
+def stream_parse_zip_json(conn: psycopg.Connection, 
+                          zip_path: str, 
+                          valid_ciks: set[int], 
+                          stop_early: int = 0) -> int:
     source_kind = "companyfacts"
     # 0) build meta list for all valid CIK members
     metas = []
@@ -85,7 +89,7 @@ def stream_parse_zip_json(conn: psycopg.Connection, zip_path: str, valid_ciks: s
 
     if not metas:
         print("No matching CIKs found.")
-        return
+        return 0
 
     # 1) one round-trip to fetch prior ledger state
     prior = ledger_bulk_get(conn, source_kind, [m["natural_key"] for m in metas])
@@ -135,17 +139,32 @@ def stream_parse_zip_json(conn: psycopg.Connection, zip_path: str, valid_ciks: s
 
     print(f"Loaded {len(changed)} changed CIKs; skipped parsing {unchanged}.")
 
+    return len(changed)
+
 
 
 
 def upsert_fundamentals(companyfacts_zip: str, securities_df: pd.DataFrame, stop_early: int = 0) -> float:
     # Pre-build a set for O(1) membership tests
     valid_ciks = set(int(x) for x in securities_df["cik"].dropna().astype("int64").tolist())
-
+    t0_dt = datetime.now()
     t0 = time.perf_counter()
     with psycopg.connect(DATABASE_URL, autocommit=False) as conn:
         ensure_tables(conn)
-        stream_parse_zip_json(conn, companyfacts_zip, valid_ciks, stop_early=stop_early)
+        changed = stream_parse_zip_json(conn, companyfacts_zip, valid_ciks, stop_early=stop_early)
+        with conn.cursor() as cur:
+            cur.execute(
+                LOG_UPLOAD_PG,
+                {
+                    "pipeline_name": "fundamentals_loader",
+                    "time_start": t0_dt,
+                    "time_end": datetime.now(),
+                    "status": "ok",
+                    "errors": None,
+                    "notes": f"{changed} records changed"
+                }
+            )
+
     return time.perf_counter() - t0
 
 

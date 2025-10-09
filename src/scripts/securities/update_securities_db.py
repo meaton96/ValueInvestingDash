@@ -101,7 +101,7 @@ def update_log(error_msg: str,
                notes: str,
                conn):
     conn.execute(
-        text(LOG_UPLOAD),
+        text(LOG_UPLOAD_ALCH),
         {
             "pipeline_name": "securities_loader",
             "time_start": t0,
