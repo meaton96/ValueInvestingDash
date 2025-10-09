@@ -88,3 +88,15 @@ CREATE INDEX IF NOT EXISTS idx_etl_source_ledger_status ON etl_source_ledger (st
 
 
 
+CREATE TABLE etl_logs (
+    id SERIAL PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    time_start TIMESTAMP NOT NULL,
+    time_end TIMESTAMP NOT NULL,
+    status VARCHAR(10),
+    errors TEXT,
+    notes TEXT
+);
+
+CREATE INDEX idx_etl_logs_pipeline_date ON etl_logs (pipeline_name, date);

@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_pipeline(write_csv: bool = True) -> None:
+def run_pipeline(write_csv: bool = False) -> None:
     """Execute the ETL workflow, optionally exporting a CSV snapshot."""
 
     df = get_securities_list()
@@ -40,12 +40,12 @@ def run_pipeline(write_csv: bool = True) -> None:
     else:
         print("Skipping securities CSV snapshot (write_csv disabled)")
 
-    response = getSECZips()
-    if response["status"] != 200:
-        return
-    print("Finished fetching data")
-    print("Parsing fundamentals zips")
-    upsertFundamentals(response["cf_path"], response["sub_path"], df)
+    # response = getSECZips()
+    # if response["status"] != 200:
+    #     return
+    # print("Finished fetching data")
+    # print("Parsing fundamentals zips")
+    # upsertFundamentals(response["cf_path"], response["sub_path"], df)
 
 
 if __name__ == "__main__":

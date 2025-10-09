@@ -157,6 +157,6 @@ if __name__ == "__main__":
     elapsed = upsert_fundamentals(
         os.path.join(SEC_DL_DIR, "companyfacts.zip"),
         df,
-        stop_early=100  # or set to an integer to limit matched CIKs processed
+        stop_early=1000  # or set to an integer to limit matched CIKs processed
     )
     print(f"ETL completed in {elapsed:.2f}s")
