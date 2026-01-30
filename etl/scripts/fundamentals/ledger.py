@@ -4,7 +4,7 @@ import psycopg
 from psycopg import sql
 import zipfile
 from psycopg.rows import tuple_row
-from src.sql_scripts.fundamentals import LEDGER_SELECT, LEDGER_UPSERT
+from etl.sql_scripts.fundamentals import LEDGER_SELECT, LEDGER_UPSERT
 
 
 def zip_member_meta(zf: zipfile.ZipFile, name: str) -> Dict[str, Any]:

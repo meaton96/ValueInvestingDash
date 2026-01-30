@@ -31,4 +31,4 @@ jobs:
 
         run: |
           . .venv/bin/activate
-          python -m src.pipeline
+          python -m etl.pipeline

@@ -1,6 +1,6 @@
 from typing import List, Tuple
 import orjson as jsonlib
-from src.scripts.utilities.normalize import normalize_value_unit
+from etl.scripts.utilities.normalize import normalize_value_unit
 
 def extract_rows_from_json(cik: int, buf_or_obj, source_file: str, TAG_MAP) -> List[Tuple]:
     """

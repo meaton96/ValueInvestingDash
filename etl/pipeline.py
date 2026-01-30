@@ -1,9 +1,9 @@
 import argparse
 
-from src.scripts.fundamentals.fetch_fund import getSECZips
-from src.scripts.fundamentals.loader import upsert_fundamentals
-from src.scripts.securities.build_security_master import get_securities_list
-from src.scripts.securities.update_securities_db import db_update
+from etl.scripts.fundamentals.fetch_fund import getSECZips
+from etl.scripts.fundamentals.loader import upsert_fundamentals
+from etl.scripts.securities.build_security_master import get_securities_list
+from etl.scripts.securities.update_securities_db import db_update
 
 
 def parse_args() -> argparse.Namespace:

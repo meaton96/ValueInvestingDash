@@ -9,12 +9,12 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import tuple_row
 
-from src.scripts.utilities.zip import open_zip
-from src.sql_scripts.fundamentals import *
-from src.sql_scripts.logs import LOG_UPLOAD_PG
-from src.scripts.fundamentals.config import FUND_COLS, DATABASE_URL, TAG_MAP, CHUNK_ROWS,SEC_DL_DIR
-from src.scripts.fundamentals.json import extract_rows_from_json
-from src.scripts.fundamentals.ledger import *
+from etl.scripts.utilities.zip import open_zip
+from etl.sql_scripts.fundamentals import *
+from etl.sql_scripts.logs import LOG_UPLOAD_PG
+from etl.scripts.fundamentals.config import FUND_COLS, DATABASE_URL, TAG_MAP, CHUNK_ROWS,SEC_DL_DIR
+from etl.scripts.fundamentals.json import extract_rows_from_json
+from etl.scripts.fundamentals.ledger import *
 
 
 def ensure_tables(conn: psycopg.Connection):

@@ -6,9 +6,9 @@ from datetime import date
 import pandas as pd
 from math import ceil
 import time
-from src.sql_scripts.securities import *
-from src.sql_scripts.logs import *
-from src.scripts.utilities.upsert import dataframe_upsert
+from etl.sql_scripts.securities import *
+from etl.sql_scripts.logs import *
+from etl.scripts.utilities.upsert import dataframe_upsert
 from typing import Tuple
 from datetime import datetime
 
