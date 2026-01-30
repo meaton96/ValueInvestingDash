@@ -6,7 +6,7 @@ on:
 jobs:
   run-loader:
     runs-on: ubuntu-latest
-    if: false
+    if: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
