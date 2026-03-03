@@ -11,7 +11,6 @@ if not DB_URI or len(DB_URI) < 1:
     raise ValueError("No DB_URI found in .env file.")
 
 # 2. Define the SQL Query (The "Base Dataset" Logic)
-# Note: I removed 'form_type' checks since your schema uses accession_no/source_file
 EXPORT_QUERY = """
 WITH latest_values AS (
     -- 1. Rank filings to find the absolute latest value for each tag per CIK
